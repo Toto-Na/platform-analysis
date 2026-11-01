@@ -7,6 +7,20 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// =====================================================================
+// DATABASE PROVIDER — Choose based on your hosting:
+//
+// • SQLite (default, works with Render/Docker/VPS):
+//     provider = "sqlite"
+//     DATABASE_URL="file:/app/data/platform.db"
+//
+// • PostgreSQL (for Vercel/Neon/Supabase — serverless hosting):
+//     provider = "postgresql"
+//     DATABASE_URL="postgresql://user:pass@host:5432/db?schema=public"
+//
+// To switch: change ONE line below + set DATABASE_URL in .env
+// Then run: bun run db:push && bun run db:seed
+// =====================================================================
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")

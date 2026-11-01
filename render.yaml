@@ -1,0 +1,34 @@
+# =====================================================================
+# Render Blueprint — Free deployment with Docker + SQLite persistent disk
+# Usage:
+#   1. Push your code to GitHub
+#   2. Go to https://dashboard.render.com/blueprints
+#   3. Connect your GitHub repo and select this render.yaml
+#   4. Render will create the service automatically
+# =====================================================================
+services:
+  - type: web
+    name: platform-analysis
+    runtime: docker
+    plan: free
+    region: frankfurt  # closest to Middle East/Arab users; alternatives: oregon, ohio, singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        # SQLite stored on persistent disk (see disks below)
+        value: file:/var/data/platform.db
+      - key: NEXTAUTH_SECRET
+        # Generate with: openssl rand -base64 48
+        sync: false  # you'll set this manually in Render dashboard
+      - key: NEXTAUTH_URL
+        # After first deploy, update this to your Render URL:
+        # https://platform-analysis.onrender.com
+        sync: false
+    disk:
+      name: platform-data
+      mountPath: /var/data
+      sizeGB: 1  # free tier allows up to 1GB persistent disk

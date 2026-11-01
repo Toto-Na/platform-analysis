@@ -48,6 +48,7 @@ tar czf "$OUTPUT_FILE" \
   .dockerignore \
   Dockerfile \
   docker-compose.yml \
+  render.yaml \
   Caddyfile \
   2>/dev/null
 
