@@ -1,0 +1,68 @@
+# =====================================================================
+# Docker Compose — Platform for Website Analysis & Comparison
+# Usage:
+#   1. Copy .env.example to .env and edit values
+#   2. docker compose up -d --build
+#   3. Visit http://localhost:3000
+# =====================================================================
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: platform-analysis
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=file:/app/data/platform.db
+    volumes:
+      # Persistent database storage (survives container restarts/rebuilds)
+      - platform_data:/app/data
+    networks:
+      - platform-net
+
+  # Optional: PostgreSQL for production scaling (uncomment & update DATABASE_URL)
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: platform-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: platform_db
+  #     POSTGRES_USER: platform
+  #     POSTGRES_PASSWORD: change-me-strong-password
+  #   volumes:
+  #     - platform_pgdata:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - platform-net
+
+  # Optional: Nginx reverse proxy with SSL (for production with domain)
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: platform-nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+  #     - ./certbot/conf:/etc/letsencrypt
+  #     - ./certbot/www:/var/www/certbot
+  #   depends_on:
+  #     - app
+  #   networks:
+  #     - platform-net
+
+volumes:
+  platform_data:
+  # platform_pgdata:
+
+networks:
+  platform-net:
+    driver: bridge

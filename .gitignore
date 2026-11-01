@@ -50,5 +50,15 @@ test
 prompt
 
 server.log
+
+# Database (SQLite) — never commit user data
+/db/
+*.db
+*.db-journal
+
 # Skills directory
 /skills/
+
+# Deployment artifacts
+certbot/
+nginx.conf.bak

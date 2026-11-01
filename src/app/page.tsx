@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useAppRouter } from '@/lib/router'
 import { LoginPage } from '@/components/auth/login-page'
@@ -15,7 +15,7 @@ import { ProfilePage } from '@/components/student/profile-page'
 import { AdminApp } from '@/components/admin/admin-app'
 import { Loader2 } from 'lucide-react'
 
-export default function Home() {
+function HomeContent() {
   const { data: session, status } = useSession()
   const { route, navigate } = useAppRouter()
 
@@ -96,4 +96,18 @@ export default function Home() {
     return <AdminApp user={user} route={{ view: 'admin', section: 'dashboard' }} onNavigate={navigate} />
   }
   return <StudentDashboard user={user} onNavigate={navigate} />
+}
+
+export default function Home() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
+  )
 }

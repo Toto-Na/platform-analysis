@@ -1,0 +1,20 @@
+# Build context exclusions for faster Docker builds
+node_modules
+.next
+.git
+.gitignore
+*.md
+.env*
+.env.local
+dev.log
+server.log
+db/
+tests/
+examples/
+skills/
+.claude
+.z-ai-config
+download/
+scripts/
+Caddyfile
+.postcss.config.mjs.swp
