@@ -1,0 +1,343 @@
+// =====================================================================
+// Platform: Website & E-commerce Analysis & Comparison Platform
+// Database: SQLite via Prisma (Code-First approach)
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================================
+// Authentication & Users
+// =====================================================================
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String
+  passwordHash      String
+  // "STUDENT" | "ADMIN"
+  role              String   @default("STUDENT")
+  isActive          Boolean  @default(true)
+  emailVerified     DateTime?
+  lastLoginAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  studentProfile    StudentProfile?
+  passwordResets    PasswordResetToken[]
+  comparisons       Comparison[]
+  adminReviews      AdminReview[]
+  auditLogs         AuditLog[]
+
+  @@index([role])
+  @@index([isActive])
+}
+
+model PasswordResetToken {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model StudentProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  academicLevelId String?
+  avatarUrl      String?
+  bio            String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  academicLevel  AcademicLevel? @relation(fields: [academicLevelId], references: [id])
+}
+
+model AcademicLevel {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  description    String?
+  sortOrder      Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  students       StudentProfile[]
+  assignments    ComparisonAssignment[]
+}
+
+// =====================================================================
+// Question System with Versioning
+// =====================================================================
+
+model QuestionCategory {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  sortOrder    Int      @default(0)
+  // "ACTIVE" | "ARCHIVED"
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  questions    Question[]
+
+  @@index([status])
+}
+
+// The "live" definition of a question. Admins edit this.
+// When a new set version is published, a snapshot is created in QuestionVersion.
+model Question {
+  id             String   @id @default(cuid())
+  categoryId     String
+  text           String
+  description    String?
+  // "SHORT_TEXT" | "LONG_TEXT" | "SINGLE_CHOICE" | "MULTIPLE_CHOICE"
+  // | "RATING_1_5" | "RATING_LEVELS" | "YES_NO" | "URL"
+  answerType     String
+  isRequired     Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  // "ACTIVE" | "INACTIVE" | "ARCHIVED"
+  status         String   @default("ACTIVE")
+  currentVersionNumber Int @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  category       QuestionCategory @relation(fields: [categoryId], references: [id])
+  options        QuestionOption[]
+  versions       QuestionVersion[]
+
+  @@index([categoryId])
+  @@index([status])
+}
+
+model QuestionOption {
+  id           String   @id @default(cuid())
+  questionId   String
+  text         String
+  value        String
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  question     Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+// Historical snapshot of a question (immutable once created)
+model QuestionVersion {
+  id             String   @id @default(cuid())
+  questionId     String
+  versionNumber  Int
+  snapshotText   String
+  snapshotDescription String?
+  snapshotAnswerType String
+  snapshotIsRequired Boolean
+  snapshotOptions String   // JSON array of {text, value}
+  createdAt      DateTime @default(now())
+
+  question       Question @relation(fields: [questionId], references: [id])
+  setItems       QuestionSetVersionItem[]
+  answers        Answer[]
+
+  @@unique([questionId, versionNumber])
+  @@index([questionId])
+}
+
+// A published set of questions (a "release" of the question bank)
+model QuestionSetVersion {
+  id             String   @id @default(cuid())
+  versionNumber  Int
+  label          String?
+  // "DRAFT" | "PUBLISHED" | "ARCHIVED"
+  status         String   @default("PUBLISHED")
+  publishedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  items          QuestionSetVersionItem[]
+  comparisons    Comparison[]
+
+  @@index([status])
+}
+
+model QuestionSetVersionItem {
+  id                  String   @id @default(cuid())
+  setVersionId        String
+  questionVersionId   String
+  sortOrder           Int
+  isRequired          Boolean
+
+  setVersion          QuestionSetVersion @relation(fields: [setVersionId], references: [id], onDelete: Cascade)
+  questionVersion     QuestionVersion @relation(fields: [questionVersionId], references: [id])
+
+  @@index([setVersionId])
+  @@index([questionVersionId])
+}
+
+// =====================================================================
+// Comparisons
+// =====================================================================
+
+model Comparison {
+  id                String   @id @default(cuid())
+  studentId         String
+  title             String
+  // "DRAFT" | "COMPLETED" | "SUBMITTED" | "UNDER_REVIEW"
+  // | "NEEDS_REVISION" | "APPROVED"
+  status            String   @default("DRAFT")
+  questionSetVersionId String?
+  // JSON summary: { bestSiteId, bestSiteName, why, lessonLearned }
+  finalOpinion      String?
+  submittedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  student           User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  questionSetVersion QuestionSetVersion? @relation(fields: [questionSetVersionId], references: [id])
+  websites          ComparisonWebsite[]
+  answers           Answer[]
+  summary           ComparisonSummary?
+  reviews           AdminReview[]
+
+  @@index([studentId])
+  @@index([status])
+}
+
+model ComparisonWebsite {
+  id             String   @id @default(cuid())
+  comparisonId   String
+  name           String
+  url            String
+  businessType   String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  comparison     Comparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  answers        Answer[]
+
+  @@index([comparisonId])
+}
+
+model Answer {
+  id                  String   @id @default(cuid())
+  comparisonId        String
+  websiteId           String
+  questionVersionId   String
+  // For SINGLE_CHOICE / YES_NO: a single value
+  // For MULTIPLE_CHOICE: JSON array of values
+  // For RATING: number as string
+  // For text types: the text content
+  value               String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  comparison          Comparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  website             ComparisonWebsite @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  questionVersion     QuestionVersion @relation(fields: [questionVersionId], references: [id])
+
+  @@unique([comparisonId, websiteId, questionVersionId])
+  @@index([comparisonId])
+  @@index([websiteId])
+}
+
+model ComparisonSummary {
+  id             String   @id @default(cuid())
+  comparisonId   String   @unique
+  bestWebsiteId  String?
+  bestWebsiteName String?
+  reason         String?
+  lessonLearned  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  comparison     Comparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+}
+
+model AdminReview {
+  id             String   @id @default(cuid())
+  comparisonId   String
+  reviewerId     String
+  // "APPROVE" | "REQUEST_REVISION"
+  action         String
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  comparison     Comparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  reviewer       User     @relation(fields: [reviewerId], references: [id])
+
+  @@index([comparisonId])
+}
+
+// =====================================================================
+// Suggested websites & assignments
+// =====================================================================
+
+model SuggestedWebsite {
+  id             String   @id @default(cuid())
+  name           String
+  url            String   @unique
+  description    String?
+  businessType   String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ComparisonAssignment {
+  id             String   @id @default(cuid())
+  academicLevelId String?
+  // "FIXED" | "OPTIONAL_ADD" | "STUDENT_CHOICE"
+  assignmentType String   @default("STUDENT_CHOICE")
+  // JSON array of website IDs that are mandatory/preset
+  presetWebsiteIds String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  academicLevel   AcademicLevel? @relation(fields: [academicLevelId], references: [id])
+}
+
+// =====================================================================
+// System Settings & Audit Logs
+// =====================================================================
+
+model SystemSetting {
+  id             String   @id @default(cuid())
+  key            String   @unique
+  value          String
+  description    String?
+  updatedAt      DateTime @updatedAt
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  userId         String?
+  // e.g. "USER_REGISTER", "ADMIN_LOGIN", "QUESTION_CREATE",
+  // "QUESTION_UPDATE", "QUESTION_ARCHIVE", "CATEGORY_CREATE",
+  // "STUDENT_DISABLE", "COMPARISON_CREATE", "COMPARISON_SUBMIT",
+  // "COMPARISON_APPROVE", "COMPARISON_REVISION"
+  action         String
+  targetType     String?
+  targetId       String?
+  description    String?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  user           User?    @relation(fields: [userId], references: [id])
+
+  @@index([action])
+  @@index([userId])
+  @@index([createdAt])
+}
